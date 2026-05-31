@@ -5,62 +5,58 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 # 1. KONFIGURACJA STRONY
-st.set_page_config(
-    page_title="InwestorVision - Dashboard ETF & Akcji",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="InwestorVision - Dashboard", layout="wide")
 
-# Stylizacja nagłówka
 st.title("📈 Dashboard Analizy Rynkowej")
-st.markdown("""
-Ta aplikacja monitoruje dane giełdowe w czasie rzeczywistym. 
-Wykorzystuje **yfinance** do pobierania danych, **Plotly** do wizualizacji i **Streamlit** jako interfejs.
-""")
+st.markdown("Dane pobierane na żywo z **Yahoo Finance**.")
 
-# 2. PANEL BOCZNY (SIDEBAR)
-st.sidebar.header("⚙️ Ustawienia Analizy")
+# 2. PANEL BOCZNY
+st.sidebar.header("⚙️ Ustawienia")
+popularne = ["AAPL", "MSFT", "TSLA", "NVDA", "SPY", "QQQ", "BTC-USD"]
+wybrane = st.sidebar.multiselect("Wybierz symbole:", popularne, default=["AAPL", "SPY"])
 
-# Wybór aktywów
-popularne_tickery = ["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA", "SPY", "QQQ", "VTI", "BTC-USD"]
-wybrane_aktywa = st.sidebar.multiselect(
-    "Wybierz symbole do porównania:",
-    popularne_tickery,
-    default=["AAPL", "SPY"]
-)
-
-# Wybór zakresu dat
-st.sidebar.subheader("Zakres czasu")
 data_start = st.sidebar.date_input("Data początkowa", datetime.now() - timedelta(days=365))
-data_koniec = st.sidebar.date_input("Data końcowa", datetime.now())
 
-# 3. FUNKCJA POBIERANIA DANYCH (Z CACHEM)
-@st.cache_data(ttl=3600) # Dane cache'owane przez godzinę
-def pobierz_notowania(symbole, start, end):
+# 3. FUNKCJA POBIERANIA DANYCH
+@st.cache_data(ttl=3600)
+def pobierz_dane(symbole, start):
     if not symbole:
         return pd.DataFrame()
-    # Pobieramy ceny zamknięcia
-    dane = yf.download(symbole, start=start, end=end)['Close']
-    
-    # Jeśli wybrano tylko jeden ticker, yfinance zwraca Series, konwertujemy na DF
+    dane = yf.download(symbole, start=start)['Close']
     if len(symbole) == 1:
         dane = dane.to_frame()
         dane.columns = symbole
     return dane
 
 # 4. LOGIKA GŁÓWNA
-if wybrane_aktywa:
-    df = pobierz_notowania(wybrane_aktywa, data_start, data_koniec)
+if wybrane:
+    df = pobierz_dane(wybrane, data_start)
     
     if not df.empty:
-        # WSKAŹNIKI KPI (Kluczowe wyniki na górze)
-        st.subheader("🚀 Aktualne ceny i zmiana")
-        kolumny_kpi = st.columns(len(wybrane_aktywa))
+        # WSKAŹNIKI KPI
+        st.subheader("🚀 Aktualne ceny")
+        kolumny = st.columns(len(wybrane))
         
-        for i, ticker in enumerate(wybrane_aktywa):
+        for i, ticker in enumerate(wybrane):
             cena_akt = df[ticker].iloc[-1]
-            cena_poprzednia = df[ticker].iloc[0]
-            zmiana_proc = ((cena_akt - cena_poprzednia) / cena_poprzednia) * 100
-            
-            kolumny_kpi[i].metric(
-                label=ticker,
+            cena_poprz = df[ticker].iloc[0]
+            zmiana = ((cena_akt - cena_poprz) / cena_poprz) * 100
+            # Poprawiona linia - wszystko w jednym wywołaniu:
+            kolumny[i].metric(label=ticker, value=f"${cena_akt:.2f}", delta=f"{zmiana:.2f}%")
+
+        st.divider()
+
+        # WYKRESY
+        c1, c2 = st.columns(2)
+        with c1:
+            st.write("### Cena w USD")
+            st.plotly_chart(px.line(df), use_container_width=True)
+        with c2:
+            st.write("### Wydajność (Start = 100)")
+            df_norm = (df / df.iloc[0]) * 100
+            st.plotly_chart(px.line(df_norm), use_container_width=True)
+
+        with st.expander("🔍 Dane tabelaryczne"):
+            st.dataframe(df.tail(10), use_container_width=True)
+else:
+    st.info("👈 Wybierz symbole na pasku bocznym.")
