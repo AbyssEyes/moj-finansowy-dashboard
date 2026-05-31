@@ -44,16 +44,33 @@ AKTYWA = {
     }
 }
 
-# 3. PANEL BOCZNY
+# 3. PANEL BOCZNY - FILTRY
 st.sidebar.header("🔍 Filtry i Ustawienia")
 
-wybrane_kategorie = st.sidebar.multiselect("Filtruj kategorie:", list(AKTYWA.keys()), default=["Indeksy (ETF)", "Giganci Technologiczni"])
+# Wybór kategorii
+wybrane_kategorie = st.sidebar.multiselect(
+    "Filtruj kategorie:", 
+    list(AKTYWA.keys()), 
+    default=["Indeksy (ETF)", "Giganci Technologiczni"]
+)
 
+# Budowanie słownika dostępnych opcji na podstawie wybranych kategorii
 dostepne_opcje = {}
 for kat in wybrane_kategorie:
     dostepne_opcje.update(AKTYWA[kat])
 
-wybrane_nazwy = st.sidebar.multiselect("Wybierz konkretne symbole:", options=list(dostepne_opcje.values()), default=[dostepne_opcje["SPY"], dostepne_opcje["AAPL"]])
+# --- POPRAWKA BŁĘDU KEYERROR ---
+# Ustalamy listę życzeń dla wartości domyślnych
+proponowane_defaulty = ["SPY", "AAPL", "BTC-USD", "QQQ"]
+# Wybieramy tylko te, które faktycznie są w słowniku dostepne_opcje
+aktualne_defaulty = [dostepne_opcje[k] for k in proponowane_defaulty if k in dostepne_opcje]
+
+wybrane_nazwy = st.sidebar.multiselect(
+    "Wybierz konkretne symbole:", 
+    options=list(dostepne_opcje.values()), 
+    default=aktualne_defaulty
+)
+# -------------------------------
 
 wybrane_tickery = [t for t, nazwa in dostepne_opcje.items() if nazwa in wybrane_nazwy]
 
@@ -87,10 +104,13 @@ if wybrane_tickery:
         st.subheader("📌 Podsumowanie okresu")
         cols = st.columns(len(wybrane_tickery))
         for i, t in enumerate(wybrane_tickery):
-            c_start = df[t].dropna().iloc[0]
-            c_end = df[t].dropna().iloc[-1]
-            zmiana = ((c_end - c_start) / c_start) * 100
-            cols[i].metric(t, f"{c_end:.2f} $", f"{zmiana:.2f}%")
+            # Upewnienie się, że bierzemy dane bez NaN dla pierwszego/ostatniego elementu
+            seria = df[t].dropna()
+            if not seria.empty:
+                c_start = seria.iloc[0]
+                c_end = seria.iloc[-1]
+                zmiana = ((c_end - c_start) / c_start) * 100
+                cols[i].metric(t, f"{c_end:.2f} $", f"{zmiana:.2f}%")
 
         st.divider()
 
@@ -101,35 +121,34 @@ if wybrane_tickery:
             st.write("### Kurs rynkowy")
             fig_price = px.line(df, labels={"value": "Cena (USD)", "Date": "Data"})
             
+            # SMA 50 dodajemy tylko jeśli wybrano jedną akcję (dla czytelności)
             if pokaz_srednia and len(wybrane_tickery) == 1:
                 sma = df.rolling(window=50).mean()
-                fig_price.add_scatter(x=sma.index, y=sma[wybrane_tickery[0]], name="SMA 50", line=dict(dash='dash'))
+                fig_price.add_scatter(x=sma.index, y=sma[wybrane_tickery[0]], name="SMA 50", line=dict(dash='dash', color='orange'))
             
             st.plotly_chart(fig_price, use_container_width=True)
 
         with tab2:
-            st.write("### Zwrot skumulowany (Osobne wykresy dla każdego aktywa)")
+            st.write("### Zwrot skumulowany (Small Multiples)")
             
-            # Normalizacja danych
-            df_norm = (df / df.dropna().iloc[0]) * 100
+            # Normalizacja danych do 100
+            df_norm = (df / df.apply(lambda x: x.dropna().iloc[0] if not x.dropna().empty else 1)) * 100
             
-            # Konwersja na format "Long" (potrzebny do facet_col)
-            # Upewniamy się, że index (Data) staje się kolumną 'Date'
+            # Konwersja na format Long do facetingu
             df_long = df_norm.reset_index().melt(id_vars='Date', var_name='Ticker', value_name='Wzrost')
             
-            # Tworzenie wykresu polowego z rozbiciem na kolumny
             fig_norm = px.area(
                 df_long, 
                 x='Date', 
                 y='Wzrost', 
                 color='Ticker',
                 facet_col='Ticker', 
-                facet_col_wrap=2,  # Maksymalnie 2 wykresy w rzędzie
+                facet_col_wrap=2,
                 labels={"Wzrost": "Wzrost %"},
-                height=300 * ((len(wybrane_tickery) // 2) + 1) # Dynamiczna wysokość
+                height=350 * ((len(wybrane_tickery) + 1) // 2)
             )
             
-            # Usunięcie zbędnych napisów "Ticker=" z nagłówków wykresów
+            # Czyszczenie nagłówków "Ticker=..."
             fig_norm.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
             
             st.plotly_chart(fig_norm, use_container_width=True)
@@ -142,5 +161,3 @@ if wybrane_tickery:
             st.dataframe(df.tail(15), use_container_width=True)
 else:
     st.info("Dodaj symbole w panelu bocznym, aby wyświetlić analizę.")
-
-st.caption("Dashboard stworzony przy użyciu Streamlit, yFinance i Plotly.")
