@@ -1,4 +1,4 @@
-# 🏛️ Globalny Dashboard Inwestycyjny - Projekt Akademicki
+# 🏛️ Globalny Dashboard Inwestycyjny - Projekt Na Studia
 
 ## 📝 Opis Projektu
 Projekt został przygotowany jako narzędzie do interaktywnej analizy danych giełdowych w czasie rzeczywistym. Aplikacja pozwala na monitorowanie kluczowych indeksów (ETF), największych spółek amerykańskich (Big Tech) oraz kryptowalut. 
@@ -24,4 +24,4 @@ Głównym celem projektu było wykorzystanie bibliotek analizy danych w języku 
 
 1. Sklonuj repozytorium:
    ```bash
-   git clone [https://github.com/TWOJA-NAZWA-UZYTKOWNIKA/moj-finansowy-dashboard.git](https://github.com/TWOJA-NAZWA-UZYTKOWNIKA/moj-finansowy-dashboard.git)
+   git clone [https://github.com/abysseyes/moj-finansowy-dashboard.git](https://github.com/abysseyes/moj-finansowy-dashboard.git)
